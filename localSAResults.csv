@@ -1,0 +1,4 @@
+Parameter Name,Base case value,Sensitivity case value,Individual effect,Total effect,Total interaction effect
+R,0.005,0.00525,6601.38,36.38,-6565.00
+Q,250,262.5,6763.8,-44.4,-6808.33
+K,0.0030,0.00315,6676.3,0.27,-6676.11
