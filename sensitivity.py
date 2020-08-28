@@ -8,6 +8,8 @@ Created on Tue Jul 14 09:06:54 2020
 
 import os
 import subprocess
+from typing import List, Tuple
+
 import pandas as pd
 import numpy as np
 import uncertainpy as un
@@ -15,39 +17,44 @@ import chaospy as cp
 import math
 
 # global variables
-gl_tracefile = "trace.dat"
-gl_e0 = 2.9
-gl_A = 0.26422
-gl_B = 1.67239511e-01
-gl_K = 1.20800129e-04
-gl_Q = 250.0
-gl_Ri = 0.01
+workspace = '/home/jh432/eclipse-workspace/Battery_source_TDF_MCU/Release'
+trace_file = "trace.dat"
+model_path = "./Battery_source_TDF_MCU"
 
-vect = [[0, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0],
-        [0, 1, 1],
-        [1, 0, 0],
-        [1, 0, 1],
-        [1, 1, 0],
-        [1, 1, 1]]
-change = [0.05]  # 5% change
-calc = np.zeros(len(vect * len(change)))
+data = {'e0': 2.9,
+        'A': 0.26422,
+        'B': 1.67239511e-01,
+        'K': 1.20800129e-04,
+        'Q': 250.0,
+        'Ri': 0.01
+        }
+
+designMatrix = [[0, 0, 0],
+                [0, 0, 1],
+                [0, 1, 0],
+                [0, 1, 1],
+                [1, 0, 0],
+                [1, 0, 1],
+                [1, 1, 0],
+                [1, 1, 1]]
+
+results = np.zeros(len(designMatrix))
 
 
-def run_model(tracefile, e0, K, A, Ri, B, Q):  # running the model with tracefile as return
-    os.chdir('/home/jh432/eclipse-workspace/Battery_source_TDF_MCU/Release')
-    cmd = ["./Battery_source_TDF_MCU", tracefile, str(e0), str(K), str(A), str(Ri), str(B), str(Q)]
+def run_model(path, config_data):  # running the model with tracefile as return
+    os.chdir(workspace)
+    cmd = [path, trace_file, str(config_data['e0']), str(config_data['K']), str(config_data['A']), str(config_data['Ri']), str(config_data['B']), str(config_data['Q'])]
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return tracefile
+    return trace_file
 
 
-def read_tracefile(tracefile_full_path, del_enable):  # reading tracefile
-    df = pd.read_csv(tracefile_full_path, delim_whitespace=True, skiprows=[1])
+def read_tracefile(del_enable):  # reading tracefile
+    trace_file_full_path = workspace + "/" + trace_file
+    df = pd.read_csv(trace_file_full_path, delim_whitespace=True, skiprows=[1])
     df = df.iloc[::1000, :]  # observing interval
     df['%time'] = df['%time'] * (1 / 3600)
     if del_enable:
-        os.remove(tracefile_full_path)
+        os.remove(trace_file_full_path)
         print("File Removed!")
     return df
 
@@ -71,27 +78,22 @@ def return_effects(calc_v):  # calculating the effects
 
 
 def run_local_sensitivity_analysis():  # running the experiment design with two levels, three factors
-    for j in range(len(change)):
-        for i in range(2 ** 3):
-            e0 = gl_e0
-            K = gl_K
-            A = gl_A
-            Ri = gl_Ri
-            B = gl_B
-            Q = gl_Q
+    for i in range(2 ** 3):
+        data['Ri'] = 0.01
+        data['Q'] = 250.0
+        data['K'] = 1.20800129e-04
 
-            print(vect[i], " ", change[j])
-            if vect[i][0] == 1:
-                Ri = Ri + (Ri * change[j])
-            if vect[i][1] == 1:
-                Q = Q + (Q * change[j])
-            if vect[i][2] == 1:
-                K = K + (K * change[j])
-            run_model(gl_tracefile, e0, K, A, Ri, B, Q)
-            path_trace = '/home/jh432/eclipse-workspace/Battery_source_TDF_MCU/Release' + "/" + gl_tracefile
-            calc[i + j * len(vect)] = extract_runtime(read_tracefile(path_trace, True))
-    print(calc)
-    print(return_effects(calc))
+        # 5% change
+        if designMatrix[i][0] == 1:
+            data['Ri'] += data['Ri'] * 0.05
+        if designMatrix[i][1] == 1:
+            data['Q'] += data['Q'] * 0.05
+        if designMatrix[i][2] == 1:
+            data['K'] += data['K'] * 0.05
+        run_model(model_path, data)
+        results[i] = extract_runtime(read_tracefile(True))
+    print(results)
+    print(return_effects(results))
 
 
 run_local_sensitivity_analysis()  # starting the analysis
